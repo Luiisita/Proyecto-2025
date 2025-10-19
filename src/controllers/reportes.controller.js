@@ -1,8 +1,8 @@
+import db from "../config/db.js";  
 
-import db from "../config/db.js";  // 
-
-
-// GET /api/ventas_mensuales?year=&month=
+// =======================
+// 📊 VENTAS MENSUALES
+// =======================
 export const getVentasMensuales = async (req, res) => {
   try {
     let { year, month } = req.query;
@@ -13,13 +13,12 @@ export const getVentasMensuales = async (req, res) => {
 
     const [rows] = await db.query(
       `SELECT 
-        WEEK(Fecha, 1) - WEEK(DATE_SUB(Fecha, INTERVAL DAYOFMONTH(Fecha)-1 DAY), 1) + 1 AS semana,
+        WEEK(rv.Fecha, 1) - WEEK(DATE_SUB(rv.Fecha, INTERVAL DAYOFMONTH(rv.Fecha)-1 DAY), 1) + 1 AS semana,
         mp.Nombre AS metodo_pago,
-        SUM(rv.Cantidad * p.Precio) AS total
-      FROM Registro_Ventas rv
+        SUM(rv.Cantidad) AS total
+      FROM  Registro_Ventas rv
       INNER JOIN Metodo_Pago mp ON rv.Id_Metodo = mp.Id_Metodo
-      INNER JOIN Productos p ON rv.Id_Productos = p.Id_Productos
-      WHERE YEAR(Fecha) = ? AND MONTH(Fecha) = ?
+      WHERE YEAR(rv.Fecha) = ? AND MONTH(rv.Fecha) = ?
       GROUP BY semana, metodo_pago
       ORDER BY semana, metodo_pago;`,
       [year, month]
@@ -33,21 +32,22 @@ export const getVentasMensuales = async (req, res) => {
 };
 
 
-    // Si quieres otro endpoint de ganancias semanales, lo defines aquí:
-  export const getSemanaEspecifica = async (req, res) => {
+// =======================
+// 📊 SEMANA ESPECÍFICA
+// =======================
+export const getSemanaEspecifica = async (req, res) => {
   try {
     const { year, week } = req.query;
     if (!year || !week) return res.status(400).json({ message: "Falta year o week" });
 
     const [rows] = await db.query(
       `SELECT 
-        WEEK(Fecha, 1) AS semana,
+        WEEK(rv.Fecha, 1) AS semana,
         mp.Nombre AS metodo_pago,
-        SUM(rv.Cantidad * p.Precio) AS total
+        SUM(rv.Cantidad) AS total
        FROM Registro_Ventas rv
        INNER JOIN Metodo_Pago mp ON rv.Id_Metodo = mp.Id_Metodo
-       INNER JOIN Productos p ON rv.Id_Productos = p.Id_Productos
-       WHERE YEAR(Fecha) = ? AND WEEK(Fecha, 1) = ?
+       WHERE YEAR(rv.Fecha) = ? AND WEEK(rv.Fecha, 1) = ?
        GROUP BY semana, metodo_pago`,
       [year, week]
     );
@@ -60,8 +60,9 @@ export const getVentasMensuales = async (req, res) => {
 };
 
 
-
-// GET /api/ventas_anuales?year=2025
+// =======================
+// 📊 VENTAS ANUALES
+// =======================
 export const getVentasAnuales = async (req, res) => {
   try {
     const { year } = req.query;
@@ -69,19 +70,18 @@ export const getVentasAnuales = async (req, res) => {
 
     const [rows] = await db.query(
       `SELECT 
-        MONTH(Fecha) AS mes,
+        MONTH(rv.Fecha) AS mes,
         mp.Nombre AS metodo_pago,
-        SUM(rv.Cantidad * p.Precio) AS total
+        SUM(rv.Cantidad) AS total
       FROM Registro_Ventas rv
       INNER JOIN Metodo_Pago mp ON rv.Id_Metodo = mp.Id_Metodo
-      INNER JOIN Productos p ON rv.Id_Productos = p.Id_Productos
-      WHERE YEAR(Fecha) = ?
+      WHERE YEAR(rv.Fecha) = ?
       GROUP BY mes, metodo_pago
       ORDER BY mes`,
       [year]
     );
 
-    // Transformar los datos en un formato más fácil para Chart.js
+    // Meses para el gráfico
     const meses = [
       "Enero","Febrero","Marzo","Abril","Mayo","Junio",
       "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
@@ -91,7 +91,7 @@ export const getVentasAnuales = async (req, res) => {
 
     const datasets = metodos.map(metodo => ({
       label: `Ganancias ${metodo}`,
-      data: Array(12).fill(0), // inicializa con 0
+      data: Array(12).fill(0),
       borderColor: "#"+Math.floor(Math.random()*16777215).toString(16),
       backgroundColor: "rgba(0,0,0,0.1)",
       fill: true
@@ -111,18 +111,19 @@ export const getVentasAnuales = async (req, res) => {
 };
 
 
-// Reporte Diario de Ganancias
+// =======================
+// 📊 GANANCIAS DIARIAS
+// =======================
 export const getGananciasDiarias = async (req, res) => {
   try {
     const { fecha } = req.params;
 
     const [rows] = await db.query(
       `SELECT mp.Nombre AS metodo_pago, 
-              SUM(rv.Cantidad * p.Precio) AS total
+              SUM(rv.Cantidad) AS total
        FROM Registro_Ventas rv
        INNER JOIN Metodo_Pago mp ON rv.Id_Metodo = mp.Id_Metodo
-       INNER JOIN Productos p ON rv.Id_Productos = p.Id_Productos
-       WHERE DATE(Fecha) = ?
+       WHERE DATE(rv.Fecha) = ?
        GROUP BY metodo_pago`,
       [fecha]
     );
